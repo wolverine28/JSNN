@@ -54,13 +54,14 @@ onehot <- function(Y){
 }
 
 #################################################################################
-
-# TODO activation : sigmoid(Done), relu(Done), tanh, elu
+#
+# TODO activation : sigmoid(Done), relu(Done), tanh(Done), elu
 # TODO output_activation : softmax(Done), sigmoid, linear
 # TODO loss: CE(Done), MSE
 # TODO L1, L2 regularization
 # TODO SGD, MOMENTUM, ADAM, RMSPROP
-
+#
+#################################################################################
 
 # initailize
 initialize_weights <- function(inputdim, layers, outputdim){
