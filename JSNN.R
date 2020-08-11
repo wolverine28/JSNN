@@ -1,5 +1,5 @@
 # OWNER : JAESUN YUN
-# Contributor : DOYEOL LEE
+# Contributor : DOOYEOL LEE
 
 # functions
 sigmoid <- function(x){
@@ -17,6 +17,13 @@ relu_derivative <- function(x){
   m <- matrix(1, nrow(x), ncol(x))
   m[x<=0] <- 0
   m
+}
+tanh <- function(x){
+  (exp(x)-exp(-x))/(exp(x)+exp(-x))
+}
+tanh_derivative <- function(x){
+  s = tanh(x)
+  1-s^2
 }
 softmax <- function(x){
   z <- x-max(x)
@@ -48,7 +55,7 @@ onehot <- function(Y){
 
 #################################################################################
 
-# TODO activation : sigmoid(Done), relu, tanh, elu
+# TODO activation : sigmoid(Done), relu(Done), tanh, elu
 # TODO output_activation : softmax(Done), sigmoid, linear
 # TODO loss: CE(Done), MSE
 # TODO L1, L2 regularization
@@ -168,17 +175,30 @@ gradients <- function(model,X,Y,weights,bias){
 
 
 # fit
-fit <- function(model,X,Y,learning_rate,epoch){
+fit <- function(model,X,Y,learning_rate,epoch,mini_batch_size){
   lr <- learning_rate
   weights <- model$weights
   bias <- model$bias
+  
+  # mini_batch_group_size <- ceiling(nrow(X)/mini_batch_size)
+  # mini_batch_idx <- (sample(1:nrow(X),nrow(X))%%mini_batch_group_size)+1
+  
   ces <- c()
   for(epo in 1:epoch){
-    grads <- gradients(model,X,Y,weights,bias)
-    for(i in 1:length(weights)){
-      weights[[i]] <- weights[[i]]-lr*grads$grad_weights[[i]]
-      bias[[i]] <- bias[[i]]-lr*grads$grad_bias[[i]]
+    # for(bch in 1:max(mini_batch_idx)){
+      # X_batch <- X[mini_batch_idx==bch,]
+      # Y_batch <- Y[mini_batch_idx==bch,]
+      
+      X_batch <- X
+      Y_batch <- Y
+      
+      grads <- gradients(model,X_batch,Y_batch,weights,bias)
+      for(i in 1:length(weights)){
+        weights[[i]] <- weights[[i]]-lr*grads$grad_weights[[i]]
+        bias[[i]] <- bias[[i]]-lr*grads$grad_bias[[i]]
+      # }
     }
+    
     model$weights <- weights
     model$bias <- bias
     loss <- caterogical_cross_entropy(real = Y,pred = predict_JSNN(model,X)$output)
@@ -196,19 +216,26 @@ fit <- function(model,X,Y,learning_rate,epoch){
 }
 
 #################################################################################
+# library(keras)
+
+# mnist <- dataset_mnist()
+
+# X <- mnist$train$x
+# X <- t(apply(X,1,function(x){as.vector(x)}))
+# Y <- onehot(mnist$train$y)
 
 X <- as.matrix(iris[,-5])
 Y <- onehot(as.numeric(iris[,5]))
 
-inputdim <- 4
-layers <- c(16,16)
-activations <- c("relu","sigmoid")
-outputdim <- 3
+inputdim <- ncol(X)
+layers <- c(16)
+activations <- c("tanh")
+outputdim <- ncol(Y)
 output_activation <- "softmax"
 loss_function <- "caterogical_cross_entropy"
 
 JSNN_model <- model(inputdim,layers,outputdim,activations,output_activation,loss_function)
-JSNN_model <- fit(JSNN_model,X,Y,0.1,10000)
+JSNN_model <- fit(JSNN_model,X,Y,0.1,10000,mini_batch_size=16)
 
 # measure
 real = Y
