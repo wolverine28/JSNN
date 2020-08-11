@@ -1,3 +1,6 @@
+# OWNER : JAESUN YUN
+# Contributor : DOYEOL LEE
+
 # functions
 sigmoid <- function(x){
   1/(1+exp(-x)) 
@@ -5,6 +8,15 @@ sigmoid <- function(x){
 sigmoid_derivative <- function(Z){
   s = sigmoid(Z)
   s * (1 - s)
+}
+relu <- function(x){
+  x[x<0] <- 0
+  x
+}
+relu_derivative <- function(x){
+  m <- matrix(1, nrow(x), ncol(x))
+  m[x<=0] <- 0
+  m
 }
 softmax <- function(x){
   z <- x-max(x)
@@ -58,6 +70,7 @@ initialize_weights <- function(inputdim, layers, outputdim){
   return(list(weights=weights,bias=bias))
 }
 # weights_bias <- initialize_weights(inputdim, layers, outputdim)
+
 
 # model
 model <- function(inputdim,layers,outputdim,activations,output_activation,loss_function){
@@ -178,7 +191,7 @@ fit <- function(model,X,Y,learning_rate,epoch){
   }
   model$weights <- weights
   model$bias <- bias
-  plot(ces)
+  plot(ces,type='l')
   return(model)
 }
 
@@ -189,7 +202,7 @@ Y <- onehot(as.numeric(iris[,5]))
 
 inputdim <- 4
 layers <- c(16,16)
-activations <- c("sigmoid","sigmoid")
+activations <- c("relu","sigmoid")
 outputdim <- 3
 output_activation <- "softmax"
 loss_function <- "caterogical_cross_entropy"
