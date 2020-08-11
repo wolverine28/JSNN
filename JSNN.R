@@ -62,8 +62,7 @@ initialize_weights <- function(inputdim, layers, outputdim){
 # model
 model <- function(inputdim,layers,outputdim,activations,output_activation,loss_function){
   if(length(layers)!=length(activations)){
-    print('length of layers and activations must be SAME length.')
-    return()
+    stop('length of layers and activations must be SAME length.')
   }
   weights_bias <- initialize_weights(inputdim, layers, outputdim)
   layer_structure <- c(inputdim, layers, outputdim)
@@ -189,14 +188,14 @@ X <- as.matrix(iris[,-5])
 Y <- onehot(as.numeric(iris[,5]))
 
 inputdim <- 4
-layers <- c(16)
-activations <- c("sigmoid")
+layers <- c(16,16)
+activations <- c("sigmoid","sigmoid")
 outputdim <- 3
 output_activation <- "softmax"
 loss_function <- "caterogical_cross_entropy"
 
 JSNN_model <- model(inputdim,layers,outputdim,activations,output_activation,loss_function)
-JSNN_model <- fit(JSNN_model,X,Y,0.1,3000)
+JSNN_model <- fit(JSNN_model,X,Y,0.1,10000)
 
 # measure
 real = Y
