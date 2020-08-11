@@ -10,6 +10,21 @@ softmax <- function(x){
   z <- x-max(x)
   exp(z)/sum(exp(z))
 }
+softmax_caterogical_cross_entropy_derivative <- function(pred,real){
+  pred-real
+}
+sigmoid_binary_cross_entropy_derivative <- function(pred,real){
+  pred-real
+}
+
+# LOSS
+caterogical_cross_entropy <- function(real, pred){
+  -sum(real*log(pred))/nrow(pred)
+}
+binary_cross_entropy <- function(real, pred){
+  -sum(real*log(pred)+(1-real)*log(1-pred))/length(real)
+}
+
 onehot <- function(Y){
   num_class <- length(unique(Y))
   oh <- matrix(0,nrow=length(Y),ncol = num_class)
@@ -19,57 +34,91 @@ onehot <- function(Y){
   oh
 }
 
+#################################################################################
 
-X <- as.matrix(iris[,-5])
-Y <- onehot(as.numeric(iris[,5]))
-
-inputdim <- 4
-layers <- c(2)
-outputdim <- 3
 # TODO activation : sigmoid(Done), relu, tanh, elu
 # TODO output_activation : softmax(Done), sigmoid, linear
 # TODO loss: CE(Done), MSE
 # TODO L1, L2 regularization
 # TODO SGD, MOMENTUM, ADAM, RMSPROP
 
+
+# initailize
+initialize_weights <- function(inputdim, layers, outputdim){
+  weights <- list()
+  bias <- list()
+  layer_structure <- c(inputdim, layers, outputdim)
+  
+  for(i in 1:(length(layer_structure)-1)){
+    weights[[i]] <- matrix(rnorm(prod(layer_structure[c(i,i+1)]),mean = 0,sd = 0.1),
+                           layer_structure[i],
+                           layer_structure[i+1])
+    bias[[i]] <- rnorm(layer_structure[i+1],mean = 0,sd = 0.1)
+  }
+  return(list(weights=weights,bias=bias))
+}
+# weights_bias <- initialize_weights(inputdim, layers, outputdim)
+
+# model
+model <- function(inputdim,layers,outputdim,activations,output_activation,loss_function){
+  if(length(layers)!=length(activations)){
+    print('length of layers and activations must be SAME length.')
+    return()
+  }
+  weights_bias <- initialize_weights(inputdim, layers, outputdim)
+  layer_structure <- c(inputdim, layers, outputdim)
+  
+  output <- list()
+  output$inputdim <- inputdim
+  output$layers <- layers
+  output$outputdim <- outputdim
+  output$layer_structure <- layer_structure
+  output$activations <- activations
+  output$output_activation <- output_activation
+  output$loss_function <- loss_function
+  
+  output$weights <- weights_bias$weights
+  output$bias <- weights_bias$bias
+  
+  return(output)
+}
+
+
 # predict
-predict_JSNN <- function(x){
+predict_JSNN <- function(model,x){
   os <- list()
   zs <- list()
   # o <- x%*%weights[[1]]+bias[[1]]
-  o <- sweep(x%*%weights[[1]],2,bias[[1]],`+`)
+  o <- sweep(x%*%model$weights[[1]],2,model$bias[[1]],`+`)
   os[[1]] <- o
-  z <- sigmoid(o)
+  z <- get(model$activations[1])(o)
   zs[[1]] <- z
   
-  if(length(layers)>1){
-    for(i in 2:(length(layers))){
+  if(length(model$layers)>1){
+    for(i in 2:(length(model$layers))){
       # o <- z%*%weights[[i]]+bias[[i]]
-      o <- sweep(z%*%weights[[i]],2,bias[[i]],`+`)
+      o <- sweep(z%*%model$weights[[i]],2,model$bias[[i]],`+`)
       os[[i]] <- o
-      z <- sigmoid(o)
+      z <- get(model$activations[i])(o)
       zs[[i]] <- z
     }
   }
 
   
   # o <- z%*%weights[[length(layer_structure)-1]]+bias[[length(layer_structure)-1]]
-  o <- sweep(z%*%weights[[length(layer_structure)-1]],2,bias[[length(layer_structure)-1]],`+`)
-  os[[length(layer_structure)-1]] <- o
+  o <- sweep(z%*%model$weights[[length(model$layer_structure)-1]],2,model$bias[[length(model$layer_structure)-1]],`+`)
+  os[[length(model$layer_structure)-1]] <- o
   
-  z <- t(apply(o,1,function(x){softmax(x)}))
-  zs[[length(layer_structure)-1]] <- z
+  z <- t(apply(o,1,function(x){get(model$output_activation)(x)}))
+  zs[[length(model$layer_structure)-1]] <- z
   return(list(output=z,os=os,zs=zs))
 }
+# predict_JSNN(JSNN_model,X)
 
-# LOSS
-multiclass_cross_entropy <- function(real, pred){
-  -sum(real*log(pred))/nrow(pred)
-}
 
 # gradients
-gradients <- function(X,Y){
-  t_output <- predict_JSNN(X)
+gradients <- function(model,X,Y,weights,bias){
+  t_output <- predict_JSNN(model,X)
   pred <- t_output$output
   real <- Y
   N <- nrow(pred)
@@ -78,7 +127,7 @@ gradients <- function(X,Y){
   grad_bias <- list()
   
   # output gradient
-  dZ <- (pred-real)
+  dZ <- get(paste0(model$output_activation,'_',model$loss_function,'_derivative'))(pred,real)
   dW <- t((t(dZ) %*% (t_output$zs[[length(weights)-1]]))/N)
   db <- colSums(dZ)/N
   dA_back <- t(weights[[length(weights)]] %*% t(dZ))
@@ -87,7 +136,8 @@ gradients <- function(X,Y){
   grad_bias[[length(bias)]] <- db
   # internal gradient
   for(i in (length(weights)-1):1){
-    dZ <- dA_back*sigmoid_derivative(t_output$os[[i]])
+    dZ <- dA_back*get(paste0(model$activations[i],'_derivative'))(t_output$os[[i]])
+    # dZ <- dA_back*sigmoid_derivative(t_output$os[[i]])
     if(i==1){
       dW <- 1./N*(t(t(dZ) %*% (X)))
     }else{
@@ -102,104 +152,53 @@ gradients <- function(X,Y){
   
   return(list(grad_weights=grad_weights,grad_bias=grad_bias))
 }
-# grads <- gradients(X,Y)
-
-
-# initailize
-weights <- list()
-bias <- list()
-layer_structure <- c(inputdim, layers, outputdim)
-
-for(i in 1:(length(layer_structure)-1)){
-  weights[[i]] <- matrix(rnorm(prod(layer_structure[c(i,i+1)]),mean = 0,sd = 0.1),
-                         layer_structure[i],
-                         layer_structure[i+1])
-  bias[[i]] <- rnorm(layer_structure[i+1],mean = 0,sd = 0.1)
-}
+# gradients(JSNN_model,X,Y,JSNN_model$weights,JSNN_model$bias)
 
 
 # fit
-lr <- 0.1
-
-ces <- c()
-for(epoch in 1:10000){
-  grads <- gradients(X,Y)
-  for(i in 1:length(weights)){
-    weights[[i]] <- weights[[i]]-lr*grads$grad_weights[[i]]
-    bias[[i]] <- bias[[i]]-lr*grads$grad_bias[[i]]
+fit <- function(model,X,Y,learning_rate,epoch){
+  lr <- learning_rate
+  weights <- model$weights
+  bias <- model$bias
+  ces <- c()
+  for(epo in 1:epoch){
+    grads <- gradients(model,X,Y,weights,bias)
+    for(i in 1:length(weights)){
+      weights[[i]] <- weights[[i]]-lr*grads$grad_weights[[i]]
+      bias[[i]] <- bias[[i]]-lr*grads$grad_bias[[i]]
+    }
+    model$weights <- weights
+    model$bias <- bias
+    loss <- caterogical_cross_entropy(real = Y,pred = predict_JSNN(model,X)$output)
+    ces <- c(ces,loss)
+    
+    if(epo%%100==0){
+      cat(sprintf("Epoch : %04d    loss = %.4f \n",epo,loss))  
+    }
+    
   }
-  ces <- c(ces,multiclass_cross_entropy(real = Y,pred = predict_JSNN(X)$output))
-  
+  model$weights <- weights
+  model$bias <- bias
+  plot(ces)
+  return(model)
 }
-plot(ces)
 
+#################################################################################
+
+X <- as.matrix(iris[,-5])
+Y <- onehot(as.numeric(iris[,5]))
+
+inputdim <- 4
+layers <- c(16)
+activations <- c("sigmoid")
+outputdim <- 3
+output_activation <- "softmax"
+loss_function <- "caterogical_cross_entropy"
+
+JSNN_model <- model(inputdim,layers,outputdim,activations,output_activation,loss_function)
+JSNN_model <- fit(JSNN_model,X,Y,0.1,3000)
 
 # measure
 real = Y
-pred = predict_JSNN(X)$output
+pred = predict_JSNN(JSNN_model,X)$output
 table(apply(Y,1,which.max),apply(pred,1,which.max))
-
-
-################
-# library(numDeriv)
-# gradients(X,Y)
-# 
-# weights
-# dims <- sapply(weights,dim)
-# 
-# weights_vec <- unlist(weights)
-# 
-# relist_weight <- function(weights_vec,dims){
-#   weights <- list()
-#   gidx <- 1
-#   for(i in 1:ncol(dims)){
-#     size <- prod(dims[,i])
-#     weights[[i]] <- matrix(weights_vec[gidx:(gidx+size-1)],dims[1,i],dims[2,i])
-#     gidx <- (gidx+size)
-#   }
-#   weights
-# }
-# 
-# 
-# 
-# 
-# func1 <- function(weights_vec){
-#   # X,Y
-#   # weights_vec
-#   x <- X
-#   predict_JSNN_weights_input <- function(weights_vec){
-#     
-#     weights <- relist_weight(weights_vec,dims)
-#     os <- list()
-#     zs <- list()
-#     
-#     o <- x%*%weights[[1]]+bias[[1]]
-#     os[[1]] <- o
-#     z <- sigmoid(o)
-#     zs[[1]] <- z
-#     
-#     for(i in 2:(length(layers))){
-#       o <- z%*%weights[[i]]+bias[[i]]
-#       os[[i]] <- o
-#       z <- sigmoid(o)
-#       zs[[i]] <- z
-#     }
-#     
-#     o <- z%*%weights[[length(layer_structure)-1]]+bias[[length(layer_structure)-1]]
-#     os[[length(layer_structure)-1]] <- o
-#     
-#     z <- t(apply(o,1,function(x){softmax(x)}))
-#     zs[[length(layer_structure)-1]] <- z
-#     return(list(output=z,os=os,zs=zs))
-#   }
-#   
-#   t <- predict_JSNN_weights_input(weights_vec)
-#   cross_entropy(real = Y,pred = t$output)
-# }
-# 
-# grad_numeric <- grad(func1,weights_vec, method="simple")
-# 
-# grad_exact <- gradients(X,Y)
-# unlist(grad_exact$grad_weights)
-# 
-# plot((grad_numeric-unlist(grad_exact$grad_weights)))
